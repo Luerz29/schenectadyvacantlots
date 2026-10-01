@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Schenectady Land Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f2ea;
+    --panel: #ffffff;
+    --ink: #1c2a24;
+    --ink-soft: #5a665f;
+    --line: #dcd5c4;
+    --moss: #2f4a3c;
+    --moss-light: #e8efe8;
+    --clay: #b2552f;
+    --clay-light: #f3e2d7;
+    --gold: #c89a3c;
+    --gold-light: #f6edda;
+    --slate: #3c5a73;
+    --slate-light: #e4edf3;
+    --danger: #a33;
+    --radius: 10px;
+    --font-display: 'Fraunces', serif;
+    --font-body: 'Inter', sans-serif;
+    font-family: var(--font-body);
+  }
+  [data-mode="dark"] {
+    --bg: #14181a;
+    --panel: #1c2225;
+    --ink: #eef0e9;
+    --ink-soft: #9aa49c;
+    --line: #2d3436;
+    --moss: #6fae8c;
+    --moss-light: #1e2b23;
+    --clay: #e08b63;
+    --clay-light: #2d2019;
+    --gold: #e0b955;
+    --gold-light: #2b2415;
+    --slate: #7fa9c9;
+    --slate-light: #1b2730;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--font-body); }
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  header {
+    background: var(--moss);
+    color: #f5f2ea;
+    padding: 14px 20px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-bottom: 3px solid var(--clay);
+  }
+  header h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 21px;
+    margin: 0;
+    letter-spacing: 0.2px;
+  }
+  header .sub {
+    font-size: 12.5px;
+    opacity: 0.8;
+    font-weight: 400;
+  }
+
+  #layout {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  #sidebar {
+    width: 290px;
+    min-width: 290px;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 16px;
+  }
+  #sidebar h2 {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 500;
+    margin: 18px 0 8px;
+    color: var(--ink);
+  }
+  #sidebar h2:first-child { margin-top: 0; }
+
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .filter-row input[type="checkbox"] {
+    width: 16px; height: 16px; accent-color: var(--moss); cursor: pointer; flex-shrink: 0;
+  }
+  .swatch { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.15); }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .stat-card {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+  }
+  .stat-card .num {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1.1;
+  }
+  .stat-card .lbl {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+
+  select, button {
+    font-family: var(--font-body);
+    font-size: 13px;
+  }
+  select {
+    width: 100%;
+    padding: 7px 8px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .btn:hover { background: var(--bg); }
+  .btn-primary { background: var(--moss); color: #fff; border-color: var(--moss); }
+  .btn-primary:hover { background: #26392f; }
+  .btn-block { width: 100%; justify-content: center; margin-top: 6px; }
+  .btn-sm { padding: 4px 9px; font-size: 12px; }
+
+  #map-wrap { flex: 1; position: relative; min-width: 0; }
+  #map { width: 100%; height: 100%; background: #e9e4d6; }
+
+  .leaflet-popup-content-wrapper {
+    border-radius: 10px;
+    font-family: var(--font-body);
+  }
+  .leaflet-popup-content { margin: 12px 14px; min-width: 220px; }
+  .pop-title { font-family: var(--font-display); font-size: 16px; font-weight: 500; margin: 0 0 6px; }
+  .pop-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 3px 0; border-bottom: 1px solid #eee; }
+  .pop-row:last-of-type { border-bottom: none; }
+  .pop-row .k { color: var(--ink-soft); }
+  .pop-row .v { text-align: right; font-weight: 500; }
+  .pop-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+  }
+  .pop-actions { margin-top: 10px; display: flex; gap: 6px; }
+  .pop-photo { width: 100%; border-radius: 7px; margin-top: 8px; display: block; }
+
+  .nbhd-label {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    text-shadow: 0 0 4px var(--bg), 0 0 4px var(--bg), 0 0 8px var(--bg);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* Modal */
+  #modal-overlay {
+    position: absolute; inset: 0; background: rgba(20, 24, 26, 0.45);
+    display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px;
+  }
+  #modal-overlay.open { display: flex; }
+  #modal {
+    background: var(--panel);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 440px;
+    max-height: 86vh;
+    overflow-y: auto;
+    padding: 22px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  }
+  #modal h3 {
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 500;
+    margin: 0 0 14px;
+  }
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .field input[type="text"], .field input[type="number"], .field textarea, .field select {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 13.5px;
+  }
+  .field textarea { resize: vertical; min-height: 56px; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row .field { flex: 1; }
+  .err { color: var(--danger); font-size: 12px; margin-top: 4px; display: none; }
+  .err.show { display: block; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 18px; }
+  .modal-actions .btn { flex: 1; }
+
+  #close-modal {
+    position: absolute; top: 14px; right: 14px; cursor: pointer; background: none; border: none; font-size: 20px; color: var(--ink-soft); padding: 4px;
+  }
+  #modal { position: relative; }
+
+  .empty-note {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    padding: 10px 0;
+  }
+
+  #photo-current { max-width: 100%; border-radius: 7px; margin-top: 6px; display: none; }
+
+  @media (max-width: 760px) {
+    #layout { flex-direction: column; }
+    #sidebar { width: 100%; min-width: 0; max-height: 40vh; border-right: none; border-bottom: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <div>
+      <h1>Schenectady land map</h1>
+      <div class="sub">Vacant lots, ownership, and what's in motion — Ancient Roots Cooperative</div>
+    </div>
+    <button class="btn btn-sm" id="add-btn" style="color:#fff;border-color:rgba(255,255,255,0.4);">+ Add a location</button>
+  </header>
+
+  <div id="layout">
+    <aside id="sidebar">
+      <h2>Overview</h2>
+      <div class="stat-grid" id="stat-grid"></div>
+
+      <h2>Category</h2>
+      <div id="category-filters"></div>
+
+      <h2>Owner type</h2>
+      <div id="owner-filters"></div>
+
+      <h2>Neighborhood</h2>
+      <select id="nbhd-select">
+        <option value="all">All neighborhoods</option>
+      </select>
+
+      <h2>Layers</h2>
+      <div class="filter-row"><input type="checkbox" id="toggle-city" checked><label for="toggle-city">City outline</label></div>
+      <div class="filter-row"><input type="checkbox" id="toggle-nbhd" checked><label for="toggle-nbhd">Neighborhood outlines</label></div>
+      <div class="filter-row"><input type="checkbox" id="toggle-pins" checked><label for="toggle-pins">Property pins</label></div>
+      <div class="filter-row"><input type="checkbox" id="toggle-motion"><label for="toggle-motion">Only show active projects</label></div>
+      <div class="filter-row"><input type="checkbox" id="toggle-transit" checked><label for="toggle-transit">Bus routes</label></div>
+      <div class="filter-row"><input type="checkbox" id="toggle-stops" checked><label for="toggle-stops">Bus stops</label></div>
+      <div class="filter-row"><input type="checkbox" id="toggle-walkshed"><label for="toggle-walkshed">1/4 mile walk to stop</label></div>
+
+      <button class="btn btn-block" id="reset-btn">Reset filters</button>
+
+      <h2>Transit legend</h2>
+      <div id="route-legend"></div>
+
+      <p class="empty-note">This map is a working document. Click any pin to see details, or add a new location as you learn about it. Neighborhood boundaries and bus routes here are approximate — refine them with real CDTA route data as it becomes available.</p>
+    </aside>
+
+    <div id="map-wrap">
+      <div id="map"></div>
+
+      <div id="modal-overlay">
+        <div id="modal">
+          <button id="close-modal" aria-label="Close">&times;</button>
+          <h3 id="modal-title">Add a location</h3>
+          <form id="location-form">
+            <div class="field">
+              <label for="f-address">Address</label>
+              <input type="text" id="f-address" placeholder="1052 Parkwood Blvd">
+              <div class="err" id="err-address">Enter an address.</div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="f-lat">Latitude</label>
+                <input type="number" step="any" id="f-lat" placeholder="42.8114">
+              </div>
+              <div class="field">
+                <label for="f-lng">Longitude</label>
+                <input type="number" step="any" id="f-lng" placeholder="-73.9183">
+              </div>
+            </div>
+            <div class="err" id="err-coords">Enter a valid latitude and longitude for Schenectady.</div>
+
+            <div class="field">
+              <label for="f-category">Category</label>
+              <select id="f-category">
+                <option value="buildable">Buildable</option>
+                <option value="verify">Needs verification</option>
+                <option value="garden">Not buildable — garden or shed</option>
+                <option value="metroplex">Metroplex owned</option>
+                <option value="bcni">BCNI owned</option>
+                <option value="community">Community space</option>
+              </select>
+            </div>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="f-owner-type">Owner type</label>
+                <select id="f-owner-type">
+                  <option value="city">City of Schenectady</option>
+                  <option value="metroplex">Metroplex</option>
+                  <option value="individual">Individual</option>
+                  <option value="llc">LLC / developer</option>
+                  <option value="bcni">BCNI</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-lot-size">Lot size (sq ft)</label>
+                <input type="number" id="f-lot-size" placeholder="4500">
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="f-owner">Owner name</label>
+              <input type="text" id="f-owner" placeholder="Owner or company name">
+            </div>
+
+            <div class="field">
+              <label for="f-status">Status / movement</label>
+              <select id="f-status">
+                <option value="none">No activity yet</option>
+                <option value="review">Under review</option>
+                <option value="contacted">City contacted</option>
+                <option value="visit">Site visit scheduled</option>
+                <option value="acquisition">Acquisition in progress</option>
+                <option value="tinyhome">Tiny home development underway</option>
+                <option value="garden-dev">Community garden underway</option>
+                <option value="complete">Complete</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="f-notes">Notes</label>
+              <textarea id="f-notes" placeholder="Any context worth remembering about this property"></textarea>
+            </div>
+
+            <div class="field">
+              <label for="f-photo">Photo URL</label>
+              <input type="text" id="f-photo" placeholder="Paste an image link, or a Google Maps street view URL">
+              <img id="photo-current" alt="Preview">
+            </div>
+
+            <div class="modal-actions">
+              <button type="button" class="btn" id="cancel-btn">Cancel</button>
+              <button type="button" class="btn btn-primary" id="save-btn">Save location</button>
+            </div>
+            <div class="modal-actions" id="delete-row" style="display:none;">
+              <button type="button" class="btn" id="delete-btn" style="color:var(--danger); border-color:var(--danger);">Delete this location</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+
+  var CATEGORY_META = {
+    buildable:  { label: "Buildable",                    color: "#3b7a4e" },
+    verify:     { label: "Needs verification",           color: "#c89a3c" },
+    garden:     { label: "Garden / shed candidate",      color: "#8a5a2e" },
+    metroplex:  { label: "Metroplex owned",               color: "#3c5a73" },
+    bcni:       { label: "BCNI owned",                    color: "#6b4a8a" },
+    community:  { label: "Community space",               color: "#b2552f" }
+  };
+
+  var OWNER_META = {
+    city:       "City of Schenectady",
+    metroplex:  "Metroplex",
+    individual: "Individual",
+    llc:        "LLC / developer",
+    bcni:       "BCNI",
+    other:      "Other"
+  };
+
+  var STATUS_META = {
+    none:        "No activity yet",
+    review:      "Under review",
+    contacted:   "City contacted",
+    visit:       "Site visit scheduled",
+    acquisition: "Acquisition in progress",
+    tinyhome:    "Tiny home development underway",
+    "garden-dev":"Community garden underway",
+    complete:    "Complete"
+  };
+
+  var SCHENECTADY_CENTER = [42.8142, -73.9396];
+
+  var NEIGHBORHOODS = [
+    { name: "Downtown", color: "#b2552f",
+      coords: [[42.8155,-73.9460],[42.8170,-73.9400],[42.8150,-73.9360],[42.8110,-73.9370],[42.8105,-73.9430],[42.8130,-73.9460]] },
+    { name: "Stockade Historic District", color: "#3c5a73",
+      coords: [[42.8190,-73.9480],[42.8210,-73.9440],[42.8185,-73.9410],[42.8160,-73.9430],[42.8160,-73.9470]] },
+    { name: "Hamilton Hill / Vale", color: "#c4433b",
+      coords: [[42.8120,-73.9330],[42.8140,-73.9260],[42.8080,-73.9230],[42.8050,-73.9300],[42.8080,-73.9350]] },
+    { name: "Mont Pleasant", color: "#3b7a4e",
+      coords: [[42.8080,-73.9350],[42.8050,-73.9300],[42.7980,-73.9330],[42.7960,-73.9420],[42.8020,-73.9460],[42.8060,-73.9420]] },
+    { name: "Central State Street", color: "#8a5a2e",
+      coords: [[42.8130,-73.9400],[42.8150,-73.9360],[42.8110,-73.9370],[42.8080,-73.9350],[42.8060,-73.9420],[42.8100,-73.9440]] },
+    { name: "Northside", color: "#6b4a8a",
+      coords: [[42.8230,-73.9330],[42.8260,-73.9260],[42.8200,-73.9220],[42.8160,-73.9280],[42.8190,-73.9340]] },
+    { name: "Goose Hill", color: "#c89a3c",
+      coords: [[42.8260,-73.9260],[42.8300,-73.9200],[42.8260,-73.9150],[42.8210,-73.9190],[42.8200,-73.9220]] },
+    { name: "Upper Union Street", color: "#3c5a73",
+      coords: [[42.8160,-73.9280],[42.8190,-73.9220],[42.8150,-73.9170],[42.8110,-73.9200],[42.8120,-73.9260]] },
+    { name: "Woodlawn", color: "#3b7a4e",
+      coords: [[42.8150,-73.9170],[42.8190,-73.9100],[42.8140,-73.9030],[42.8080,-73.9080],[42.8080,-73.9150],[42.8110,-73.9200]] },
+    { name: "Bellevue", color: "#b2552f",
+      coords: [[42.8080,-73.9080],[42.8030,-73.9020],[42.7970,-73.9060],[42.7960,-73.9150],[42.8010,-73.9170]] },
+    { name: "Little Italy", color: "#c4433b",
+      coords: [[42.8170,-73.9420],[42.8185,-73.9410],[42.8180,-73.9390],[42.8160,-73.9400]] },
+    { name: "General Electric Realty Plot", color: "#6b4a8a",
+      coords: [[42.8180,-73.9230],[42.8200,-73.9170],[42.8160,-73.9140],[42.8130,-73.9180],[42.8150,-73.9220]] }
+  ];
+
+  var BUS_ROUTES = [
+    { id: "cdta-1", name: "Route 1 \u2014 State St", color: "#1d6fa5",
+      path: [[42.8130,-73.9690],[42.8160,-73.9560],[42.8150,-73.9430],[42.8140,-73.9330],[42.8120,-73.9230],[42.8090,-73.9150]] },
+    { id: "cdta-5", name: "Route 5 \u2014 Union St / Crosstown", color: "#1d9e75",
+      path: [[42.8120,-73.9550],[42.8150,-73.9440],[42.8170,-73.9330],[42.8190,-73.9230],[42.8200,-73.9140]] },
+    { id: "cdta-55", name: "Route 55 \u2014 Van Vranken", color: "#d85a30",
+      path: [[42.8130,-73.9400],[42.8180,-73.9360],[42.8240,-73.9280],[42.8300,-73.9210]] },
+    { id: "cdta-114", name: "Route 114 \u2014 Altamont / Mont Pleasant", color: "#7f77dd",
+      path: [[42.8110,-73.9440],[42.8060,-73.9420],[42.8010,-73.9400],[42.7970,-73.9380]] }
+  ];
+
+  var BUS_STOPS = [
+    { name: "State St & Erie Blvd", lat: 42.8139, lng: -73.9398 },
+    { name: "State St & Lafayette St", lat: 42.8148, lng: -73.9460 },
+    { name: "Union St & Nott Terrace", lat: 42.8163, lng: -73.9325 },
+    { name: "Crane St & Michigan Ave", lat: 42.7966, lng: -73.9467 },
+    { name: "Van Vranken & Craig St", lat: 42.8245, lng: -73.9260 },
+    { name: "Altamont Ave & Mohawk Ave", lat: 42.8010, lng: -73.9400 },
+    { name: "Broadway & Jay St (Schenectady Transit Hub)", lat: 42.8135, lng: -73.9402 }
+  ];
+
+  var WALK_RADIUS_METERS = 400;
+
+  var SAMPLE_LOCATIONS = [
+    { id: "s1", address: "1052 Parkwood Blvd", lat: 42.81137, lng: -73.91829, category: "buildable", owner_type: "individual", owner: "Ramkishun Arjune Singh", lot_size: 4800, status: "review", notes: "Single owner, standard residential value, 311 zoned.", photo: "" },
+    { id: "s2", address: "1057 Hegeman St", lat: 42.79317, lng: -73.96253, category: "buildable", owner_type: "individual", owner: "Dindayal Ramnarine", lot_size: 4200, status: "none", notes: "311 zoned, good value range, single owner.", photo: "" },
+    { id: "s3", address: "1027 Barrett St", lat: 42.81689, lng: -73.93737, category: "verify", owner_type: "llc", owner: "Work Light Associates LLC", lot_size: 5200, status: "contacted", notes: "Class 312, improvements present, close to downtown.", photo: "" },
+    { id: "s4", address: "320 Liberty St", lat: 42.8150, lng: -73.9400, category: "metroplex", owner_type: "metroplex", owner: "Schenectady Metroplex Authority", lot_size: 12000, status: "none", notes: "Parking lot, moderate value, candidate for a utilization count.", photo: "" },
+    { id: "s5", address: "705 State St", lat: 42.8138, lng: -73.9420, category: "community", owner_type: "other", owner: "Blue Sky Realty", lot_size: 9000, status: "none", notes: "Commercial vacant with improvements — potential shared community building site.", photo: "" },
+    { id: "s6", address: "Van Vranken Ave cluster", lat: 42.8247, lng: -73.9243, category: "garden", owner_type: "llc", owner: "Good Clean Money LLC", lot_size: 900, status: "none", notes: "Low value adjacent parcels, likely subdivided strip — garden candidate.", photo: "" }
+  ];
+
+  var STORAGE_KEY = "arc_schenectady_map_locations_v1";
+  var locations = [];
+  try {
+    var saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    locations = (saved && saved.length) ? saved : SAMPLE_LOCATIONS.slice();
+  } catch (e) {
+    locations = SAMPLE_LOCATIONS.slice();
+  }
+
+  function persist() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(locations)); } catch (e) {}
+  }
+
+  var activeFilters = {
+    categories: Object.keys(CATEGORY_META),
+    owners: Object.keys(OWNER_META),
+    neighborhood: "all",
+    onlyMotion: false
+  };
+
+  var map = L.map('map', { zoomControl: true }).setView(SCHENECTADY_CENTER, 13);
+
+  L.tileLayer('https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/layers.png', {}).remove();
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap, &copy; CARTO',
+    maxZoom: 19
+  }).addTo(map);
+
+  var cityOutlineCoords = [
+    [42.8320,-73.9550],[42.8300,-73.9150],[42.8050,-73.8980],
+    [42.7920,-73.9100],[42.7900,-73.9450],[42.7980,-73.9650],
+    [42.8150,-73.9680],[42.8280,-73.9600]
+  ];
+  var cityOutline = L.polygon(cityOutlineCoords, {
+    color: '#1c2a24', weight: 2.5, fill: false, dashArray: '6 4'
+  });
+
+  var nbhdLayer = L.layerGroup();
+  var nbhdLabelLayer = L.layerGroup();
+  NEIGHBORHOODS.forEach(function (n) {
+    var poly = L.polygon(n.coords, {
+      color: n.color, weight: 1.5, fillColor: n.color, fillOpacity: 0.08
+    });
+    poly.on('click', function () { showNeighborhoodStats(n.name); });
+    poly.bindTooltip(n.name, { sticky: true, className: 'nbhd-label' });
+    poly.addTo(nbhdLayer);
+
+    var center = poly.getBounds().getCenter();
+    L.marker(center, {
+      icon: L.divIcon({ className: '', html: '<div class="nbhd-label">' + n.name + '</div>', iconSize: [0,0] }),
+      interactive: false
+    }).addTo(nbhdLabelLayer);
+  });
+
+  var pinLayer = L.layerGroup().addTo(map);
+
+  var routeLayer = L.layerGroup();
+  BUS_ROUTES.forEach(function (route) {
+    var line = L.polyline(route.path, { color: route.color, weight: 4, opacity: 0.75 });
+    line.bindTooltip(route.name, { sticky: true });
+    line.addTo(routeLayer);
+  });
+
+  var stopIcon = L.divIcon({
+    className: '',
+    html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:3px solid #1d6fa5;box-shadow:0 1px 2px rgba(0,0,0,0.4);"></div>',
+    iconSize: [10, 10],
+    iconAnchor: [5, 5]
+  });
+  var stopLayer = L.layerGroup();
+  BUS_STOPS.forEach(function (stop) {
+    L.marker([stop.lat, stop.lng], { icon: stopIcon })
+      .bindTooltip(stop.name)
+      .addTo(stopLayer);
+  });
+
+  var walkshedLayer = L.layerGroup();
+  function buildWalkshed() {
+    walkshedLayer.clearLayers();
+    BUS_STOPS.forEach(function (stop) {
+      L.circle([stop.lat, stop.lng], {
+        radius: WALK_RADIUS_METERS,
+        color: '#1d6fa5', weight: 1, fillColor: '#1d6fa5', fillOpacity: 0.07
+      }).addTo(walkshedLayer);
+    });
+  }
+  buildWalkshed();
+
+  routeLayer.addTo(map);
+  stopLayer.addTo(map);
+
+  function renderRouteLegend() {
+    var box = document.getElementById('route-legend');
+    box.innerHTML = '';
+    BUS_ROUTES.forEach(function (r) {
+      var row = document.createElement('div');
+      row.className = 'filter-row';
+      row.style.cursor = 'default';
+      row.innerHTML = '<span class="swatch" style="background:' + r.color + '"></span>' + r.name;
+      box.appendChild(row);
+    });
+  }
+
+  function makeDivIcon(color) {
+    return L.divIcon({
+      className: '',
+      html: '<div style="width:16px;height:16px;border-radius:50% 50% 50% 0;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4);transform:rotate(-45deg);"></div>',
+      iconSize: [16, 16],
+      iconAnchor: [8, 16]
+    });
+  }
+
+  var markerIndex = {};
+
+  function renderPins() {
+    pinLayer.clearLayers();
+    markerIndex = {};
+    var visible = getFilteredLocations();
+    visible.forEach(function (loc) {
+      var meta = CATEGORY_META[loc.category] || CATEGORY_META.buildable;
+      var marker = L.marker([loc.lat, loc.lng], { icon: makeDivIcon(meta.color) });
+      marker.bindPopup(renderPopup(loc), { maxWidth: 280 });
+      marker.on('popupopen', function () { attachPopupHandlers(loc.id); });
+      marker.addTo(pinLayer);
+      markerIndex[loc.id] = marker;
+    });
+    updateStats(visible);
+  }
+
+  function renderPopup(loc) {
+    var meta = CATEGORY_META[loc.category] || CATEGORY_META.buildable;
+    var html = '<div class="pop-badge" style="background:' + meta.color + '22;color:' + meta.color + ';">' + meta.label + '</div>';
+    html += '<p class="pop-title">' + escapeHtml(loc.address) + '</p>';
+    html += '<div class="pop-row"><span class="k">Owner</span><span class="v">' + escapeHtml(loc.owner || '\u2014') + '</span></div>';
+    html += '<div class="pop-row"><span class="k">Owner type</span><span class="v">' + (OWNER_META[loc.owner_type] || '\u2014') + '</span></div>';
+    html += '<div class="pop-row"><span class="k">Lot size</span><span class="v">' + (loc.lot_size ? Number(loc.lot_size).toLocaleString() + ' sq ft' : '\u2014') + '</span></div>';
+    html += '<div class="pop-row"><span class="k">Status</span><span class="v">' + (STATUS_META[loc.status] || '\u2014') + '</span></div>';
+    var nearestStop = findNearestStop(loc.lat, loc.lng);
+    if (nearestStop) {
+      html += '<div class="pop-row"><span class="k">Nearest bus stop</span><span class="v">' + Math.round(nearestStop.distance) + ' ft</span></div>';
+    }
+    if (loc.notes) {
+      html += '<div class="pop-row" style="display:block;"><span class="k">Notes</span><div style="margin-top:4px;font-weight:400;">' + escapeHtml(loc.notes) + '</div></div>';
+    }
+    if (loc.photo) {
+      html += '<img class="pop-photo" src="' + escapeAttr(loc.photo) + '" alt="Property photo" onerror="this.style.display=\'none\'">';
+    }
+    html += '<div class="pop-actions"><button class="btn btn-sm" data-edit="' + loc.id + '">Edit</button>';
+    html += '<button class="btn btn-sm" data-maps="' + escapeAttr(loc.lat + ',' + loc.lng) + '">Street view</button></div>';
+    return html;
+  }
+
+  function attachPopupHandlers(id) {
+    setTimeout(function () {
+      var editBtn = document.querySelector('[data-edit="' + id + '"]');
+      if (editBtn) editBtn.addEventListener('click', function () { openModal(id); });
+      var mapsBtn = document.querySelector('[data-maps]');
+      if (mapsBtn) {
+        mapsBtn.addEventListener('click', function () {
+          var coords = mapsBtn.getAttribute('data-maps');
+          openLinkSafe('https://www.google.com/maps/@' + coords + ',3a,75y,0h,90t/data=!3m6!1e1');
+        });
+      }
+    }, 0);
+  }
+
+  function openLinkSafe(url) {
+    if (typeof openLink === 'function') { openLink(url); }
+    else { window.open(url, '_blank'); }
+  }
+
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+  function escapeAttr(s) { return escapeHtml(s).replace(/"/g, '&quot;'); }
+
+  function getFilteredLocations() {
+    return locations.filter(function (loc) {
+      if (activeFilters.categories.indexOf(loc.category) === -1) return false;
+      if (activeFilters.owners.indexOf(loc.owner_type) === -1) return false;
+      if (activeFilters.onlyMotion && (loc.status === 'none' || !loc.status)) return false;
+      if (activeFilters.neighborhood !== 'all') {
+        var n = findNeighborhoodFor(loc.lat, loc.lng);
+        if (n !== activeFilters.neighborhood) return false;
+      }
+      return true;
+    });
+  }
+
+  function findNearestStop(lat, lng) {
+    if (!BUS_STOPS.length) return null;
+    var best = null;
+    BUS_STOPS.forEach(function (stop) {
+      var d = haversineFeet(lat, lng, stop.lat, stop.lng);
+      if (!best || d < best.distance) best = { stop: stop, distance: d };
+    });
+    return best;
+  }
+
+  function haversineFeet(lat1, lon1, lat2, lon2) {
+    var R = 20902231;
+    var toRad = function (d) { return d * Math.PI / 180; };
+    var dLat = toRad(lat2 - lat1);
+    var dLon = toRad(lon2 - lon1);
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  function findNeighborhoodFor(lat, lng) {
+    var pt = [lat, lng];
+    for (var i = 0; i < NEIGHBORHOODS.length; i++) {
+      if (pointInPolygon(pt, NEIGHBORHOODS[i].coords)) return NEIGHBORHOODS[i].name;
+    }
+    return null;
+  }
+
+  function pointInPolygon(point, vs) {
+    var x = point[0], y = point[1];
+    var inside = false;
+    for (var i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+      var xi = vs[i][0], yi = vs[i][1];
+      var xj = vs[j][0], yj = vs[j][1];
+      var intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function updateStats(visibleLocations) {
+    var total = visibleLocations.length;
+    var byCat = {};
+    Object.keys(CATEGORY_META).forEach(function (k) { byCat[k] = 0; });
+    visibleLocations.forEach(function (l) { if (byCat[l.category] !== undefined) byCat[l.category]++; });
+    var active = visibleLocations.filter(function (l) { return l.status && l.status !== 'none'; }).length;
+
+    var grid = document.getElementById('stat-grid');
+    grid.innerHTML =
+      '<div class="stat-card"><div class="num">' + total + '</div><div class="lbl">Total shown</div></div>' +
+      '<div class="stat-card"><div class="num">' + (byCat.buildable || 0) + '</div><div class="lbl">Buildable</div></div>' +
+      '<div class="stat-card"><div class="num">' + active + '</div><div class="lbl">In motion</div></div>' +
+      '<div class="stat-card"><div class="num">' + ((byCat.metroplex||0)+(byCat.bcni||0)) + '</div><div class="lbl">Public / BCNI held</div></div>';
+  }
+
+  function showNeighborhoodStats(name) {
+    var all = locations.filter(function (l) { return findNeighborhoodFor(l.lat, l.lng) === name; });
+    var sel = document.getElementById('nbhd-select');
+    sel.value = name in Object.fromEntries ? name : sel.value;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === name) { sel.selectedIndex = i; break; }
+    }
+    activeFilters.neighborhood = name;
+    renderPins();
+  }
+
+  function buildFilterUI() {
+    var catBox = document.getElementById('category-filters');
+    catBox.innerHTML = '';
+    Object.keys(CATEGORY_META).forEach(function (key) {
+      var meta = CATEGORY_META[key];
+      var row = document.createElement('label');
+      row.className = 'filter-row';
+      row.innerHTML = '<input type="checkbox" checked data-cat="' + key + '">' +
+                       '<span class="swatch" style="background:' + meta.color + '"></span>' + meta.label;
+      catBox.appendChild(row);
+    });
+    catBox.querySelectorAll('input[type=checkbox]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        activeFilters.categories = Array.prototype.slice.call(catBox.querySelectorAll('input:checked')).map(function (c) { return c.getAttribute('data-cat'); });
+        renderPins();
+      });
+    });
+
+    var ownerBox = document.getElementById('owner-filters');
+    ownerBox.innerHTML = '';
+    Object.keys(OWNER_META).forEach(function (key) {
+      var row = document.createElement('label');
+      row.className = 'filter-row';
+      row.innerHTML = '<input type="checkbox" checked data-owner="' + key + '">' + OWNER_META[key];
+      ownerBox.appendChild(row);
+    });
+    ownerBox.querySelectorAll('input[type=checkbox]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        activeFilters.owners = Array.prototype.slice.call(ownerBox.querySelectorAll('input:checked')).map(function (c) { return c.getAttribute('data-owner'); });
+        renderPins();
+      });
+    });
+
+    var nbhdSelect = document.getElementById('nbhd-select');
+    NEIGHBORHOODS.forEach(function (n) {
+      var opt = document.createElement('option');
+      opt.value = n.name; opt.textContent = n.name;
+      nbhdSelect.appendChild(opt);
+    });
+    nbhdSelect.addEventListener('change', function () {
+      activeFilters.neighborhood = nbhdSelect.value;
+      renderPins();
+    });
+  }
+
+  document.getElementById('toggle-city').addEventListener('change', function (e) {
+    if (e.target.checked) cityOutline.addTo(map); else map.removeLayer(cityOutline);
+  });
+  document.getElementById('toggle-nbhd').addEventListener('change', function (e) {
+    if (e.target.checked) { nbhdLayer.addTo(map); nbhdLabelLayer.addTo(map); }
+    else { map.removeLayer(nbhdLayer); map.removeLayer(nbhdLabelLayer); }
+  });
+  document.getElementById('toggle-pins').addEventListener('change', function (e) {
+    if (e.target.checked) pinLayer.addTo(map); else map.removeLayer(pinLayer);
+  });
+  document.getElementById('toggle-motion').addEventListener('change', function (e) {
+    activeFilters.onlyMotion = e.target.checked;
+    renderPins();
+  });
+  document.getElementById('toggle-transit').addEventListener('change', function (e) {
+    if (e.target.checked) routeLayer.addTo(map); else map.removeLayer(routeLayer);
+  });
+  document.getElementById('toggle-stops').addEventListener('change', function (e) {
+    if (e.target.checked) stopLayer.addTo(map); else map.removeLayer(stopLayer);
+  });
+  document.getElementById('toggle-walkshed').addEventListener('change', function (e) {
+    if (e.target.checked) walkshedLayer.addTo(map); else map.removeLayer(walkshedLayer);
+  });
+
+  document.getElementById('reset-btn').addEventListener('click', function () {
+    activeFilters = { categories: Object.keys(CATEGORY_META), owners: Object.keys(OWNER_META), neighborhood: 'all', onlyMotion: false };
+    document.querySelectorAll('#category-filters input, #owner-filters input').forEach(function (cb) { cb.checked = true; });
+    document.getElementById('nbhd-select').value = 'all';
+    document.getElementById('toggle-motion').checked = false;
+    renderPins();
+  });
+
+  var editingId = null;
+
+  function openModal(id) {
+    editingId = id || null;
+    var overlay = document.getElementById('modal-overlay');
+    var title = document.getElementById('modal-title');
+    var deleteRow = document.getElementById('delete-row');
+    clearErrors();
+
+    if (editingId) {
+      var loc = locations.find(function (l) { return l.id === editingId; });
+      title.textContent = 'Edit location';
+      document.getElementById('f-address').value = loc.address || '';
+      document.getElementById('f-lat').value = loc.lat;
+      document.getElementById('f-lng').value = loc.lng;
+      document.getElementById('f-category').value = loc.category;
+      document.getElementById('f-owner-type').value = loc.owner_type;
+      document.getElementById('f-lot-size').value = loc.lot_size || '';
+      document.getElementById('f-owner').value = loc.owner || '';
+      document.getElementById('f-status').value = loc.status || 'none';
+      document.getElementById('f-notes').value = loc.notes || '';
+      document.getElementById('f-photo').value = loc.photo || '';
+      deleteRow.style.display = 'flex';
+      updatePhotoPreview();
+    } else {
+      title.textContent = 'Add a location';
+      document.getElementById('location-form').reset();
+      document.getElementById('f-category').value = 'buildable';
+      document.getElementById('f-owner-type').value = 'individual';
+      document.getElementById('f-status').value = 'none';
+      deleteRow.style.display = 'none';
+      document.getElementById('photo-current').style.display = 'none';
+    }
+    overlay.classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+    editingId = null;
+  }
+
+  function clearErrors() {
+    document.getElementById('err-address').classList.remove('show');
+    document.getElementById('err-coords').classList.remove('show');
+  }
+
+  function updatePhotoPreview() {
+    var url = document.getElementById('f-photo').value.trim();
+    var img = document.getElementById('photo-current');
+    if (url) { img.src = url; img.style.display = 'block'; }
+    else { img.style.display = 'none'; }
+  }
+  document.getElementById('f-photo').addEventListener('input', updatePhotoPreview);
+
+  document.getElementById('add-btn').addEventListener('click', function () { openModal(null); });
+  document.getElementById('close-modal').addEventListener('click', closeModal);
+  document.getElementById('cancel-btn').addEventListener('click', closeModal);
+  document.getElementById('modal-overlay').addEventListener('click', function (e) {
+    if (e.target.id === 'modal-overlay') closeModal();
+  });
+
+  document.getElementById('save-btn').addEventListener('click', function () {
+    clearErrors();
+    var address = document.getElementById('f-address').value.trim();
+    var lat = parseFloat(document.getElementById('f-lat').value);
+    var lng = parseFloat(document.getElementById('f-lng').value);
+    var valid = true;
+
+    if (!address) { document.getElementById('err-address').classList.add('show'); valid = false; }
+    if (isNaN(lat) || isNaN(lng) || lat < 42.5 || lat > 43.0 || lng < -74.2 || lng > -73.7) {
+      document.getElementById('err-coords').classList.add('show'); valid = false;
+    }
+    if (!valid) return;
+
+    var data = {
+      address: address,
+      lat: lat,
+      lng: lng,
+      category: document.getElementById('f-category').value,
+      owner_type: document.getElementById('f-owner-type').value,
+      lot_size: parseFloat(document.getElementById('f-lot-size').value) || null,
+      owner: document.getElementById('f-owner').value.trim(),
+      status: document.getElementById('f-status').value,
+      notes: document.getElementById('f-notes').value.trim(),
+      photo: document.getElementById('f-photo').value.trim()
+    };
+
+    if (editingId) {
+      var idx = locations.findIndex(function (l) { return l.id === editingId; });
+      locations[idx] = Object.assign({ id: editingId }, data);
+    } else {
+      data.id = 'loc_' + Date.now();
+      locations.push(data);
+    }
+    persist();
+    closeModal();
+    renderPins();
+  });
+
+  document.getElementById('delete-btn').addEventListener('click', function () {
+    if (!editingId) return;
+    locations = locations.filter(function (l) { return l.id !== editingId; });
+    persist();
+    closeModal();
+    renderPins();
+  });
+
+  cityOutline.addTo(map);
+  nbhdLayer.addTo(map);
+  nbhdLabelLayer.addTo(map);
+  buildFilterUI();
+  renderRouteLegend();
+  renderPins();
+
+</script>
+</body>
+</html>
